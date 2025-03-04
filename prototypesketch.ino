@@ -4,7 +4,6 @@
         VCC: +5
         GND: GND
         OUT: A5 , a4
-      *If I can find more ff duponts, BT will be reinstated*
 
       laser emitter out a3
 
@@ -19,8 +18,6 @@
         GND: GND
         SIGNAL: SERVO1 / PIN 10
 
-
-      could also utilize laser emitter, but again... not enough ff duponts.
 */
 
 #include <Servo.h>
