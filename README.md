@@ -41,7 +41,6 @@ made a diagram in Fritzing to show how Battle tank wires.
 - **Black (GND)** → Leftmost pin (next to middle GND)  
 - **Red (PWR)** → Rightmost pin  
 
->  *Incorrect wiring may cause unexpected motor behavior.*
 
 ## Misc Wiring (Analog Pins)
 - **A0**: *Laser Receiver?*  
@@ -58,11 +57,9 @@ made a diagram in Fritzing to show how Battle tank wires.
 
 ### Power Requirements
 - **ESP32 requires a separate and adequate power source** to avoid voltage issues.  
-- Inadequate power may result in **malfunction or unstable operation**.  
 
 ### Grounding
 - **ESP32 must share a common ground with the board. Make sure to properly ground all the components.**
-> Failure to ground properly may cause signal transmission issues or damage the ESP32, components, or arduino / motor shield itself.  
 
 ## TODO
 - **Correct Servo Movement:** Ensure smooth and delay-free movement of the tank servos from controller input. *(The tank servos are controlled via the right thumbstick.)*
