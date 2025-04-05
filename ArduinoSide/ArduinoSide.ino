@@ -103,11 +103,7 @@ void loop() {
        initial();  // Call the initial setup function
      }
 
-  // Check input from Serial Monitor
-  if (Serial.available() > 0) {
-    char command = Serial.read();
-    processCommand(command);
-  }
+
 
 
   
