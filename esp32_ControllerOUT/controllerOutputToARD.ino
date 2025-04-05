@@ -1,7 +1,7 @@
 #include <Bluepad32.h>
 #include <HardwareSerial.h>
 
-// Create serial port for communication with Arduino
+
 HardwareSerial SerialPort(2); // Use hardware serial port 2
 
 ControllerPtr myControllers[BP32_MAX_GAMEPADS];
@@ -57,12 +57,15 @@ void processGamepad(ControllerPtr ctl) {
   static uint8_t prevDpad = 0;
   static int16_t prevAxisX = 0;
   static int16_t prevAxisY = 0;
+  static int16_t prevAxisRX = 0;
+  static int16_t prevAxisRY = 0;
   
-  // Check if any button state has changed
-  if (ctl->buttons() != prevButtons || ctl->dpad() != prevDpad || 
-      abs(ctl->axisX() - prevAxisX) > 25 || abs(ctl->axisY() - prevAxisY) > 25) {
+  // Check if any state (including right stick) has changed
+  //  if (ctl->buttons() != prevButtons || ctl->dpad() != prevDpad || 
+  //      abs(ctl->axisX() - prevAxisX) > 25 || abs(ctl->axisY() - prevAxisY) > 25 ||
+  //      abs(ctl->axisRX() - prevAxisRX) > 25 || abs(ctl->axisRY() - prevAxisRY) > 25) {
     
-    // Send button state to Arduino
+    // Send button state and stick positions to Arduino
     SerialPort.print("BTN:");
     SerialPort.print(ctl->buttons(), HEX);
     SerialPort.print(",DPAD:");
@@ -70,7 +73,11 @@ void processGamepad(ControllerPtr ctl) {
     SerialPort.print(",LX:");
     SerialPort.print(ctl->axisX());
     SerialPort.print(",LY:");
-    SerialPort.println(ctl->axisY());
+    SerialPort.print(ctl->axisY());
+    SerialPort.print(",RX:");
+    SerialPort.print(ctl->axisRX());
+    SerialPort.print(",RY:");
+    SerialPort.println(ctl->axisRY());
     
     // Also print to local serial for debugging
     Serial.print("Sent to Arduino - BTN:");
@@ -80,17 +87,22 @@ void processGamepad(ControllerPtr ctl) {
     Serial.print(",LX:");
     Serial.print(ctl->axisX());
     Serial.print(",LY:");
-    Serial.println(ctl->axisY());
+    Serial.print(ctl->axisY());
+    Serial.print(",RX:");
+    Serial.print(ctl->axisRX());
+    Serial.print(",RY:");
+    Serial.println(ctl->axisRY());
     
     // Update previous states
     prevButtons = ctl->buttons();
     prevDpad = ctl->dpad();
     prevAxisX = ctl->axisX();
     prevAxisY = ctl->axisY();
-  }
-  
-  // Process specific buttons (for your reference)
-  
+    prevAxisRX = ctl->axisRX();
+    prevAxisRY = ctl->axisRY();
+  //  }
+
+  // Example of detecting button presses 
   // PS4 X button (0x0001)
   if ((ctl->buttons() & 0x0001) && !(prevButtons & 0x0001)) {
     SerialPort.println("X button pressed");
@@ -111,6 +123,7 @@ void processGamepad(ControllerPtr ctl) {
     SerialPort.println("Triangle button pressed");
   }
 }
+
 
 void processControllers() {
   for (auto myController : myControllers) {
@@ -146,13 +159,18 @@ void setup() {
   // Send initial message to Arduino
   SerialPort.println("ESP32 controller system ready!");
 }
+unsigned long lastSendTime = 0;
+const unsigned long sendInterval = 10; // send every 50ms
 
-// Arduino loop function
 void loop() {
-  // This call fetches all the controllers' data
-  bool dataUpdated = BP32.update();
-  if (dataUpdated)
-    processControllers();
+ BP32.update(); // still required to refresh controller state
 
-  delay(20); // Shorter delay for more responsive controls
+  unsigned long now = millis();
+  if (now - lastSendTime >= sendInterval) {
+    lastSendTime = now;
+    processControllers(); // ALWAYS send controller state on timer
+  }
+
+  //  tiny delay in case of watchdog resets
+  delay(1);
 }
