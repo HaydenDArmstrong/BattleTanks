@@ -1,5 +1,8 @@
 # LaserTanks
 
+## Battle Tank Fizz File
+made a diagram in Fritzing to show how Battle tank wires.
+
 ## ControllerOutputToArduino
 - Code to be uploaded to the **ESP32**.
 - The ESP32 connects to the **controller** and outputs controller information, including:
