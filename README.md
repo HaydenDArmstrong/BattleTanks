@@ -7,7 +7,7 @@
   - D-pad press state
   - Thumbstick axis data
 - This is accomplished mainly through the **BluePad32** library.
-- Data is sent to the **Arduino** through the transmission cable.
+- Data is sent to the **Arduino** through the transmission pin out and recieving pin in.
 
 ## ArduinoSide
 - Code to be uploaded to the **Arduino**.
