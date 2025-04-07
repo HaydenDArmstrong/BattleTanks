@@ -15,22 +15,9 @@ const uint8_t DPAD_RIGHT = 0x04;
 const uint8_t DPAD_LEFT = 0x08;
 
 // Joystick deadzone
-const int JOYSTICK_DEADZONE = 50;
+const int JOYSTICK_DEADZONE = 60;
 
-// Servo position variables
-int lastLRservo = 90; // Initial position for horizontal servo
-int lastUDservo = 90; // Initial position for vertical servo
 
-void smoothMoveServo(PWMServo &servo, int &currentPos, int targetPos, int easingFactor = 10) {
-    targetPos = constrain(targetPos, 0, 180);
-    
-    // Move in small increments toward the target
-    int difference = targetPos - currentPos;
-    if (abs(difference) > 1) {
-        currentPos += difference / easingFactor; // Smaller step toward target
-        servo.write(currentPos);
-    }
-}
 
 // Read data from ESP32
 void checkEspController() {
@@ -139,21 +126,22 @@ void processEspData() {
     Serial.println("MOVE: Stop");
   }
 
-  // Simplified right stick logic for servo control
-  if (abs(rxVal) > JOYSTICK_DEADZONE) {
-    int targetLRPos = map(rxVal, -512, 512, 0, 180);
-    smoothMoveServo(LRServo, lastLRservo, targetLRPos);
-    Serial.print("Servo Horizontal: ");
-    Serial.println(lastLRservo);
-  }
+ // Simplified right stick logic for servo control
+if (abs(rxVal) > JOYSTICK_DEADZONE) {
+  int scaledRxVal = rxVal / 2; // Scale down the value
+  int targetLRPos = map(scaledRxVal, -256, 256, 170, 10); // Adjust mapping range accordingly
+  LRServo.write(targetLRPos);
+  Serial.print("Servo Horizontal: ");
+  Serial.println(targetLRPos);
+}
 
-  if (abs(ryVal) > JOYSTICK_DEADZONE) {
-    int targetUDPos = map(ryVal, -512, 512, 0, 180);
-    smoothMoveServo(UDServo, lastUDservo, targetUDPos);
-    Serial.print("Servo Vertical: ");
-    Serial.println(lastUDservo);
-  }
-  
+if (abs(ryVal) > JOYSTICK_DEADZONE) {
+  int scaledRyVal = ryVal / 2; // Scale down the value
+  int targetUDPos = map(scaledRyVal, -256, 256, 170, 10); // Adjust mapping range accordingly
+  UDServo.write(targetUDPos);
+  Serial.print("Servo Vertical: ");
+  Serial.println(targetUDPos);
+}
   // D-PAD CONTROL LOGIC (alternate control)
   // Only process if joystick is centered
   if (abs(lxVal) <= JOYSTICK_DEADZONE && abs(lyVal) <= JOYSTICK_DEADZONE) {
@@ -175,29 +163,25 @@ void processEspData() {
     }
   }
 
-  int lastServoUD = 90;
-  int lastServoLR = 90;
+int horizontalServoPosition = 90; // Initial horizontal servo position
+int verticalServoPosition = 90; 
   
-  // BUTTON FUNCTION PLACEHOLDERS
-  // Left empty for custom programming
-  if (btnVal & BTN_X) {
-    // X/A button function
-    //down
-    UDServo.write(lastServoUD - 45);
-  }
-  else if (btnVal & BTN_CIRCLE) {
-    //right
-    LRServo.write(lastServoLR - 45);
-
-  }
-  else if (btnVal & BTN_SQUARE) {
-    //left
-    LRServo.write(lastServoUD + 45);
-  }
-  else if (btnVal & BTN_TRIANGLE) {
-    //up
-    UDServo.write(lastServoLR + 45);
-  }
+ if (btnVal & BTN_X) {
+    // Down button pressed
+    LRServo.write(horizontalServoPosition);
+} 
+else if (btnVal & BTN_TRIANGLE) {
+    // Up button pressed
+   UDServo.write(verticalServoPosition);
+} 
+else if (btnVal & BTN_SQUARE) {
+    // Left button pressed
+    
+} 
+else if (btnVal & BTN_CIRCLE) {
+    // Right button pressed
+    
+}
   else if (btnVal & BTN_L1) {
     LRServo.write(90); // Move to center position
   }
