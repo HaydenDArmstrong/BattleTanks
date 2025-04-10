@@ -56,7 +56,8 @@ made a diagram in Fritzing to show how Battle tank wires.
 - **TX of ESP32 must connect to RX of the board and vice versa.**
 
 ### Power Requirements
-- **ESP32 requires a separate and adequate power source** to avoid voltage issues.  
+- **ESP32 requires a separate and adequate power source** to avoid voltage issues.
+- MAKE SURE THE LASER RECIEVER HAS THE PHOTORESISTOR IN THE RIGHT DIRECTION (NUB FACING TOWARDS PINS) OR SHIT GONNA BURN.
 
 ### Grounding
 - **ESP32 must share a common ground with the board. Make sure to properly ground all the components.**
