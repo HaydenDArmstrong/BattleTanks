@@ -61,9 +61,9 @@ void processGamepad(ControllerPtr ctl) {
   static int16_t prevAxisRY = 0;
   
   // Check if any state (including right stick) has changed
-  //  if (ctl->buttons() != prevButtons || ctl->dpad() != prevDpad || 
-  //      abs(ctl->axisX() - prevAxisX) > 25 || abs(ctl->axisY() - prevAxisY) > 25 ||
-  //      abs(ctl->axisRX() - prevAxisRX) > 25 || abs(ctl->axisRY() - prevAxisRY) > 25) {
+    // if (ctl->buttons() != prevButtons || ctl->dpad() != prevDpad || 
+    //     abs(ctl->axisX() - prevAxisX) > 25 || abs(ctl->axisY() - prevAxisY) > 25 ||
+    //     abs(ctl->axisRX() - prevAxisRX) > 25 || abs(ctl->axisRY() - prevAxisRY) > 25) {
     
     // Send button state and stick positions to Arduino
     SerialPort.print("BTN:");
@@ -100,9 +100,9 @@ void processGamepad(ControllerPtr ctl) {
     prevAxisY = ctl->axisY();
     prevAxisRX = ctl->axisRX();
     prevAxisRY = ctl->axisRY();
-  //  }
+    // }
 
-  // Example of detecting button presses 
+  // Example of detecting button presses (for reference)
   // PS4 X button (0x0001)
   if ((ctl->buttons() & 0x0001) && !(prevButtons & 0x0001)) {
     SerialPort.println("X button pressed");
@@ -163,14 +163,11 @@ unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 10; // send every 50ms
 
 void loop() {
- BP32.update(); // still required to refresh controller state
+ 
+   // This call fetches all the controllers' data
+  bool dataUpdated = BP32.update();
+  if (dataUpdated )
+    processControllers();
 
-  unsigned long now = millis();
-  if (now - lastSendTime >= sendInterval) {
-    lastSendTime = now;
-    processControllers(); // ALWAYS send controller state on timer
-  }
-
-  //  tiny delay in case of watchdog resets
-  delay(1);
+  delay(2); // Shorter delay for more responsive controls
 }
