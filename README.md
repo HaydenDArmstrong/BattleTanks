@@ -43,8 +43,8 @@ made a diagram in Fritzing to show how Battle tank wires.
 
 
 ## Misc Wiring (Analog Pins)
-- **A0**: *Laser Receiver?*  
-- **A1**: *Laser Receiver?*  
+- **A0**: *Laser Receiver*  
+- **A1**: *Laser Receiver*  
 - **A2**: *(Unused)*  
 - **A3**: Laser emitter pin  
 - **A4**: ESP32 Receiving IN (connect to ESP32 pin **17**)  
