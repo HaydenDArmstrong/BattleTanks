@@ -1,10 +1,14 @@
 #include <Bluepad32.h>
 #include <HardwareSerial.h>
+#include <uni.h>
 
 
 HardwareSerial SerialPort(2); // Use hardware serial port 2
 
 ControllerPtr myControllers[BP32_MAX_GAMEPADS];
+
+// Predefined Bluetooth address of the allowed controller. implement once BT address is known
+// static const char* controller_addr_string = "00:11:22:33:44:55";
 
 // This callback gets called any time a new gamepad is connected.
 void onConnectedController(ControllerPtr ctl) {
@@ -15,6 +19,16 @@ void onConnectedController(ControllerPtr ctl) {
       ControllerProperties properties = ctl->getProperties();
       Serial.printf("Controller model: %s, VID=0x%04x, PID=0x%04x\n", ctl->getModelName().c_str(), properties.vendor_id, properties.product_id);
       
+      // Get the Bluetooth address of the controller
+      char btAddress[18]; // Format: XX:XX:XX:XX:XX:XX
+      sprintf(btAddress, "%02X:%02X:%02X:%02X:%02X:%02X",
+      properties.btaddr[0], properties.btaddr[1], properties.btaddr[2],
+      properties.btaddr[3], properties.btaddr[4], properties.btaddr[5]);
+      
+      Serial.printf("Controller Bluetooth Address: %s\n", btAddress);
+      Serial.printf("Controller model: %s, VID=0x%04x, PID=0x%04x\n",
+      ctl->getModelName().c_str(), properties.vendor_id, properties.product_id);
+
       // Send controller connection message to Arduino
       SerialPort.println("Controller connected!");
       
@@ -151,6 +165,13 @@ void setup() {
   const uint8_t* addr = BP32.localBdAddress();
   Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
+  //uncomment this once bt address is known.
+  // Configure allowlist
+    // bd_addr_t controller_addr;
+    // sscanf_bd_addr(controller_addr_string, controller_addr);
+    // uni_bt_allowlist_add_addr(controller_addr); // Add the controller to the allowlist
+    // uni_bt_allowlist_set_enabled(true);         // Enable the allowlist
+  
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedController, &onDisconnectedController);
   BP32.forgetBluetoothKeys();
@@ -160,14 +181,32 @@ void setup() {
   SerialPort.println("ESP32 controller system ready!");
 }
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 10; // send every 50ms
+const unsigned long sendInterval = 2; // send every 2ms
 
 void loop() {
- 
-   // This call fetches all the controllers' data
-  bool dataUpdated = BP32.update();
-  if (dataUpdated )
-    processControllers();
+ // Get the current time
+  unsigned long currentTime = millis();
 
-  delay(2); // Shorter delay for more responsive controls
+  // Check if the required interval has passed
+  if (currentTime - lastSendTime >= sendInterval) {
+    lastSendTime = currentTime; // Update the last execution time
+
+    // Fetch controller data
+    bool dataUpdated = BP32.update();
+
+    // Process controllers only if data has been updated
+    if (dataUpdated) {
+      processControllers();
+    } else {
+      // No new data - reapply the last known state to ensure servo consistency
+      for (auto myController : myControllers) {
+        if (myController && myController->isConnected() && myController->isGamepad()) {
+          // Re-apply the last known joystick positions or button states
+          processGamepad(myController); 
+        }
+      }
+    }
+
+  }
 }
+
