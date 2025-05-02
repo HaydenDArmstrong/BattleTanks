@@ -23,6 +23,7 @@ const int UDServoPin = 9; // Pin for "Servo 1" on l293d
 // Laser receiver globals
 const int laserReceiverLeftPin = A2;
 const int laserReceiverRightPin = A1;
+const int laserReceiverMiddlePin = A0;
 const int laserTurret = A3;
 
 // Motor sensor globals
@@ -32,6 +33,8 @@ const int DIR_CLK = 4;    // Data input clock line
 const int DIR_EN = 7;     // Enable pins
 const int DATA = 8;       // USB cable
 const int DIR_LATCH = 12; // Output memory latch clock
+
+
 
 // Directional constants
 const int aFwd = 39;      // Move Forward
@@ -51,8 +54,8 @@ const int LeftBwd = 136;  // Lower Right Move
 // const int Drift_Right = 10;        // Drift on Right
 
 // Set the default speed between 1 and 255
-int SpeedL = 255;
-int SpeedR = 255;
+int SpeedL = 150;
+int SpeedR = 150;
 
 void setup() {
   // Serial communication
@@ -77,22 +80,22 @@ void setup() {
   pinMode(PWML, OUTPUT);
 
   // Initial debug
-  Serial.println("Setup complete. Starting loop...");
-  Serial.println("ESP32 controller integration ready...");
+  Serial.println("Setup complete. Starting loop...");                               
+
 }
 
 void loop() {
   if (lives > 0) {
 
-     if (!hasInitialized) {
-       initial();  // Call the initial setup function
-     }
+       if (!hasInitialized) {
+         initial();  // Call the initial setup function
+       }
 
     // Check for new controller data
-    checkEspController();
+    readEspControllerData();
 
     // Process controller data if new data is available
-    processEspData();
+    processControllerData();
 
   } else if (lives == 0) {
     Serial.println("No lives left. Game Over!");
