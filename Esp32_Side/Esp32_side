@@ -1,295 +1,219 @@
-// Controller button constants
-namespace ControllerButtons {
-    const uint16_t X = 0x0001;
-    const uint16_t CIRCLE = 0x0002;
-    const uint16_t SQUARE = 0x0004;
-    const uint16_t TRIANGLE = 0x0008;
-    const uint16_t L1 = 0x0010;
-    const uint16_t R1 = 0x0020;
-    const uint16_t L2 = 0x0040;
-    const uint16_t R2 = 0x0080;
-}
+#include <Bluepad32.h>
+#include <HardwareSerial.h>
+#include <uni.h>
 
-// D-pad constants
-namespace DPad {
-    const uint8_t UP = 0x01;
-    const uint8_t DOWN = 0x02;
-    const uint8_t RIGHT = 0x04;
-    const uint8_t LEFT = 0x08;
-}
 
-// Joystick configuration
-namespace JoystickConfig {
-    const int DEADZONE = 80;                  // Joystick movement threshold
-    const float SMOOTH_RATE_UD = 25;        // Up-Down movement smoothing
-    const float SMOOTH_RATE_LR = 9.0;        // Left-Right movement smoothing
-    const int UPDATE_INTERVAL_MS = 10;        // Update interval in milliseconds
-    const unsigned long DEBOUNCE_TIME_MS = 10;// Joystick debounce time
-    const unsigned long DEBOUNCE_DELAY_MS = 5;// Debounce delay
-    
-    const int STARTING_POS_LR = 80;           // Left-Right starting position (centered)
-    const int STARTING_POS_UD = 155;          // Up-Down starting position
-    const int UD_MIN = 140;                   // Up-Down minimum position
-    const int UD_MAX = 180;                   // Up-Down maximum position
-    const int LR_MIN = 10;                     // Left-Right minimum position
-    const int LR_MAX = 170;                   // Left-Right maximum position
-}
+HardwareSerial SerialPort(2); // Use hardware serial port 2
 
-// Turret control
-void flashLaserTurret() {
-    digitalWrite(laserTurret, LOW);           // Turn off momentarily
-    delay(400);                               // Flash duration
-    digitalWrite(laserTurret, HIGH);          // Turn back on
-}
+ControllerPtr myControllers[BP32_MAX_GAMEPADS];
 
-// Life management
-void handleLaserHit() {
-    if (lives > 0) {
-        lives--;
-        Serial.print("Laser hit! Lives remaining: ");
-        Serial.println(lives);
-    } else {
-        Serial.println("No lives left. Game Over!");
-        digitalWrite(laserTurret, LOW);
-        Motor(Stop, 0, 0);
+// Predefined Bluetooth address of the allowed controller. implement once BT address is known
+//xbox 
+// Controller model: XBox One, VID=0x045e, PID=0x0b22
+// Controller Bluetooth Address: AC:8E:BD:1A:9A:80
+// Controller model: XBox One, VID=0x045e, PID=0x0b22
+//ps5 
+// Controller model: DualSense, VID=0x054c, PID=0x0ce6
+// Controller Bluetooth Address: BC:C7:46:01:90:5A
+// Controller model: DualSense, VID=0x054c, PID=0x0ce6
+  static const char* controller_addr_string = "AC:8E:BD:1A:9A:80";
+
+// This callback gets called any time a new gamepad is connected.
+void onConnectedController(ControllerPtr ctl) {
+  bool foundEmptySlot = false;
+  for (int i = 0; i < BP32_MAX_GAMEPADS; i++) {
+    if (myControllers[i] == nullptr) {
+      Serial.printf("CALLBACK: Controller is connected, index=%d\n", i);
+      ControllerProperties properties = ctl->getProperties();
+      Serial.printf("Controller model: %s, VID=0x%04x, PID=0x%04x\n", ctl->getModelName().c_str(), properties.vendor_id, properties.product_id);
+      
+      // Get the Bluetooth address of the controller
+      char btAddress[18]; // Format: XX:XX:XX:XX:XX:XX
+      sprintf(btAddress, "%02X:%02X:%02X:%02X:%02X:%02X",
+      properties.btaddr[0], properties.btaddr[1], properties.btaddr[2],
+      properties.btaddr[3], properties.btaddr[4], properties.btaddr[5]);
+      
+      Serial.printf("Controller Bluetooth Address: %s\n", btAddress);
+      Serial.printf("Controller model: %s, VID=0x%04x, PID=0x%04x\n",
+      ctl->getModelName().c_str(), properties.vendor_id, properties.product_id);
+
+      // Send controller connection message to Arduino
+      SerialPort.println("Controller connected!");
+      
+      myControllers[i] = ctl;
+      foundEmptySlot = true;
+      break;
     }
+  }
+
+  if (!foundEmptySlot) {
+    Serial.println("CALLBACK: Controller connected, but could not found empty slot");
+  }
 }
 
-// ESP32 data reading
-void readEspControllerData() {
-    static const size_t MAX_DATA_LENGTH = 100;
-    
-    while (espSerial.available() > 0) {
-        char c = espSerial.read();
-        if (c == '\n') {
-            newEspData = true;
-            return;
-        }
-        
-        espData += c;
-        if (espData.length() > MAX_DATA_LENGTH) {
-             espData = "";
-            newEspData = false;
-        }
+void onDisconnectedController(ControllerPtr ctl) {
+  bool foundController = false;
+
+  for (int i = 0; i < BP32_MAX_GAMEPADS; i++) {
+    if (myControllers[i] == ctl) {
+      Serial.printf("CALLBACK: Controller disconnected from index=%d\n", i);
+      
+      // Send controller disconnection message to Arduino
+      SerialPort.println("Controller disconnected!");
+      
+      myControllers[i] = nullptr;
+      foundController = true;
+      break;
     }
+  }
+
+  if (!foundController) {
+    Serial.println("CALLBACK: Controller disconnected, but not found in myControllers");
+  }
 }
 
-// Data parsing helper
-bool parseControllerData(const String& data, uint16_t& btnVal, uint8_t& dpadVal, 
-                        int& lxVal, int& lyVal, int& rxVal, int& ryVal) {
-    // Validate data format
-    if (!data.startsWith("BTN:")) {
-        Serial.println("Error: Invalid data format");
-        return false;
-    }
-
-    // Find all field positions
-    const int btnPos = data.indexOf("BTN:") + 4;
-    const int dpadPos = data.indexOf(",DPAD:") + 6;
-    const int lxPos = data.indexOf(",LX:") + 4;  
-    const int lyPos = data.indexOf(",LY:") + 4;
-    const int rxPos = data.indexOf(",RX:") + 4; 
-    const int ryPos = data.indexOf(",RY:") + 4;
-
-    // Validate positions
-    if (btnPos <= 3 || dpadPos <= 5 || lxPos <= 3 || lyPos <= 3 || rxPos <= 3 || ryPos <= 3) {
-        return false;
-    }
-
-    // Extract and convert values
-    btnVal = strtol(data.substring(btnPos, data.indexOf(",DPAD:")).c_str(), nullptr, 16);
-    dpadVal = strtol(data.substring(dpadPos, data.indexOf(",LX:")).c_str(), nullptr, 16);
-    lxVal = data.substring(lxPos, data.indexOf(",LY:")).toInt();
-    lyVal = data.substring(lyPos, data.indexOf(",RX:")).toInt();
-    rxVal = data.substring(rxPos, data.indexOf(",RY:")).toInt();
-    ryVal = data.substring(ryPos).toInt();
-
-    // Validate joystick values
-    if (lxVal > 512 || lyVal > 512 || rxVal > 512 || ryVal > 512) {
-        Serial.println("Error: Invalid joystick values (greater than 512)");
-        return false;
-    }
-
-    return true;
-}
-
-// Motor control based on joystick input
-void handleLeftJoystick(int lxVal, int lyVal) {
-    static unsigned long lastJoystickAction = 0;
-    static bool joystickActive = false;
-    
-    const bool leftJoystickActive = abs(lxVal) > JoystickConfig::DEADZONE || 
-                                   abs(lyVal) > JoystickConfig::DEADZONE;
-
-    if (leftJoystickActive) {
-        if (!joystickActive || (millis() - lastJoystickAction > JoystickConfig::DEBOUNCE_DELAY_MS)) {
-            joystickActive = true;
-            lastJoystickAction = millis();
-
-            if (abs(lyVal) > abs(lxVal)) {
-                if (lyVal < -JoystickConfig::DEADZONE) {
-                    Motor(aFwd, SpeedL, SpeedR);
-                    Serial.print("FWD ");
-                } else if (lyVal > JoystickConfig::DEADZONE) {
-                    Motor(aBwd, SpeedL, SpeedR);
-                    Serial.print("BWD ");
-                }
-            } else {
-                if (lxVal < -JoystickConfig::DEADZONE) {
-                    Motor(LeftFwd, SpeedL, SpeedR);
-                    Serial.print("LEFT ");
-                } else if (lxVal > JoystickConfig::DEADZONE) {
-                    Motor(RightFwd, SpeedL, SpeedR);
-                    Serial.print("RIGHT ");
-                }
-            }
-        }
-    } else {
-        joystickActive = false;
-        Motor(Stop, 0, 0);
-    }
-}
-
-// Turret control based on right joystick
-void handleRightJoystick(int rxVal, int ryVal) {
-    static unsigned long lastJoystickAction = 0;
-    static bool joystickActive = false;
-    static int currentLRPos = JoystickConfig::STARTING_POS_LR;
-    static int currentUDPos = JoystickConfig::STARTING_POS_UD;
-    
-    const bool rightJoystickActive = abs(rxVal) > JoystickConfig::DEADZONE || 
-                                    abs(ryVal) > JoystickConfig::DEADZONE;
-
-    if (rightJoystickActive) {
-        if (!joystickActive || (millis() - lastJoystickAction > JoystickConfig::DEBOUNCE_DELAY_MS)) {
-            joystickActive = true;
-            lastJoystickAction = millis();
-
-            if (abs(ryVal) > abs(rxVal)) {
-                // Vertical movement
-                const int targetUDPos = map(ryVal, -512, 512, JoystickConfig::UD_MIN, JoystickConfig::UD_MAX);
-                currentUDPos += (targetUDPos - currentUDPos) / JoystickConfig::SMOOTH_RATE_LR;
-                UDServo.write(currentUDPos);
-                LRServo.write(currentLRPos);
-                // Servo positions
-   
-    Serial.print(" | Servos: LR=");
-    Serial.print(currentLRPos);
-    Serial.print("°, UD=");
-    Serial.print(currentUDPos);
-    Serial.print("°");
-
-            } else {
-                // Horizontal movement
-                const int targetLRPos = map(rxVal, -512, 512, JoystickConfig::LR_MAX, JoystickConfig::LR_MIN);
-                currentLRPos += (targetLRPos - currentLRPos) / JoystickConfig::SMOOTH_RATE_LR;
-                LRServo.write(currentLRPos);
-                UDServo.write(currentUDPos);
-
-    Serial.print(" | Servos: LR=");
-    Serial.print(currentLRPos);
-    Serial.print("°, UD=");
-    Serial.print(currentUDPos);
-    Serial.print("° | ");
-
-            }
-        }
-    } else {
-        joystickActive = false;
-    }
-}
-
-// Button controls for turret
-void handleButtons(uint16_t btnVal) {
-    if (btnVal & ControllerButtons::X) {
-        UDServo.write(JoystickConfig::UD_MAX);
-    } else if (btnVal & ControllerButtons::TRIANGLE) {
-        UDServo.write(JoystickConfig::UD_MIN);
-    } else if (btnVal & ControllerButtons::SQUARE) {
-        LRServo.write(JoystickConfig::LR_MAX);
-
-        LRServo.write(JoystickConfig::LR_MIN);
-    }
-}
-
-// Process controller data
-void processControllerData() {
-    digitalWrite(laserTurret, HIGH); // Ensure turret is on
-    
-    // Check for laser hits
-    if (lives > 0) {
-        const int laserLeft = digitalRead(laserReceiverLeftPin);
-        const int laserMiddle = digitalRead(laserReceiverMiddlePin);
-        const int laserRight = digitalRead(laserReceiverRightPin);
-
-        //laserlefte has to be high on grey turret for whatever reason
-         if (laserLeft == LOW5|| laserRight == LOW || laserMiddle == LOW) {
-             Serial.println("Laser detected!");
-             Motor(Stop, 0, 0);
-             flashLaserTurret();
-             handleLaserHit();
-         }
-        delay(3); // Small delay for sensor stability
-    }
-
-    if (!newEspData) return;
-
-    // Parse controller data
-    uint16_t btnVal;
-    uint8_t dpadVal;
-    int lxVal, lyVal, rxVal, ryVal;
-    
-    if (!parseControllerData(espData, btnVal, dpadVal, lxVal, lyVal, rxVal, ryVal)) {
-        espData = "";
-        newEspData = false;
-        return;
-    }
-
-    // Handle controls
-    handleLeftJoystick(lxVal, lyVal);
-    handleRightJoystick(rxVal, ryVal);
-    handleButtons(btnVal);
-    
-    // Debug output
-    printControllerDebug(btnVal, dpadVal, lxVal, lyVal, rxVal, ryVal);
-    
-    // Reset data flags
-     espData = "";
-    newEspData = false;
-}
-
-
-void printControllerDebug(uint16_t btnVal, uint8_t dpadVal, int lxVal, int lyVal, int rxVal, int ryVal) {
-    static int currentLRPos = JoystickConfig::STARTING_POS_LR;
-    static int currentUDPos = JoystickConfig::STARTING_POS_UD;
-
-    Serial.print("Controller Debug:");
-    Serial.print("Buttons: ");
-    if (btnVal & ControllerButtons::X) Serial.print("X ");
-    if (btnVal & ControllerButtons::CIRCLE) Serial.print("CIRCLE ");
-    if (btnVal & ControllerButtons::SQUARE) Serial.print("SQUARE ");
-    if (btnVal & ControllerButtons::TRIANGLE) Serial.print("TRIANGLE ");
-    if (btnVal & ControllerButtons::L1) Serial.print("L1 ");
-    if (btnVal & ControllerButtons::R1) Serial.print("R1 ");
-    if (btnVal & ControllerButtons::L2) Serial.print("L2 ");
-    if (btnVal & ControllerButtons::R2) Serial.print("R2 ");
+// Process gamepad and send button states to Arduino
+void processGamepad(ControllerPtr ctl) {
+  // Store the previous button state to detect changes
+  static uint16_t prevButtons = 0;
+  static uint8_t prevDpad = 0;
+  static int16_t prevAxisX = 0;
+  static int16_t prevAxisY = 0;
+  static int16_t prevAxisRX = 0;
+  static int16_t prevAxisRY = 0;
   
+  // Check if any state (including right stick) has changed
+    // if (ctl->buttons() != prevButtons || ctl->dpad() != prevDpad || 
+    //     abs(ctl->axisX() - prevAxisX) > 25 || abs(ctl->axisY() - prevAxisY) > 25 ||
+    //     abs(ctl->axisRX() - prevAxisRX) > 25 || abs(ctl->axisRY() - prevAxisRY) > 25) {
+    
+    // Send button state and stick positions to Arduino
+    SerialPort.print("BTN:");
+    SerialPort.print(ctl->buttons(), HEX);
+    SerialPort.print(",DPAD:");
+    SerialPort.print(ctl->dpad(), HEX);
+    SerialPort.print(",LX:");
+    SerialPort.print(ctl->axisX());
+    SerialPort.print(",LY:");
+    SerialPort.print(ctl->axisY());
+    SerialPort.print(",RX:");
+    SerialPort.print(ctl->axisRX());
+    SerialPort.print(",RY:");
+    SerialPort.println(ctl->axisRY());
+    
+    // Also print to local serial for debugging
+    Serial.print("Sent to Arduino - BTN:");
+    Serial.print(ctl->buttons(), HEX);
+    Serial.print(",DPAD:");
+    Serial.print(ctl->dpad(), HEX);
+    Serial.print(",LX:");
+    Serial.print(ctl->axisX());
+    Serial.print(",LY:");
+    Serial.print(ctl->axisY());
+    Serial.print(",RX:");
+    Serial.print(ctl->axisRX());
+    Serial.print(",RY:");
+    Serial.println(ctl->axisRY());
+    
+    // Update previous states
+    prevButtons = ctl->buttons();
+    prevDpad = ctl->dpad();
+    prevAxisX = ctl->axisX();
+    prevAxisY = ctl->axisY();
+    prevAxisRX = ctl->axisRX();
+    prevAxisRY = ctl->axisRY();
+    // }
 
-    Serial.print("D-Pad: ");
-    if (dpadVal & DPad::UP) Serial.print("UP ");
-    if (dpadVal & DPad::DOWN) Serial.print("DOWN ");
-    if (dpadVal & DPad::LEFT) Serial.print("LEFT ");
-    if (dpadVal & DPad::RIGHT) Serial.print("RIGHT ");
+  // Example of detecting button presses (for reference)
+  // PS4 X button (0x0001)
+  if ((ctl->buttons() & 0x0001) && !(prevButtons & 0x0001)) {
+    SerialPort.println("X button pressed");
+  }
+  
+  // PS4 Circle button (0x0002)
+  if ((ctl->buttons() & 0x0002) && !(prevButtons & 0x0002)) {
+    SerialPort.println("Circle button pressed");
+  }
+  
+  // PS4 Square button (0x0004)
+  if ((ctl->buttons() & 0x0004) && !(prevButtons & 0x0004)) {
+    SerialPort.println("Square button pressed");
+  }
+  
+  // PS4 Triangle button (0x0008)
+  if ((ctl->buttons() & 0x0008) && !(prevButtons & 0x0008)) {
+    SerialPort.println("Triangle button pressed");
+  }
+}
 
-    Serial.print("Joysticks:");
-    Serial.print("  Left  (LX, LY): (");
-    Serial.print(lxVal);
-    Serial.print(", ");
-    Serial.print(lyVal);
-    Serial.print(")");
-    Serial.print("  Right (RX, RY): (");
-    Serial.print(rxVal);
-    Serial.print(", ");
-    Serial.print(ryVal);
-    Serial.print(")");
-    Seri
+
+void processControllers() {
+  for (auto myController : myControllers) {
+    if (myController && myController->isConnected() && myController->hasData()) {
+      if (myController->isGamepad()) {
+         processGamepad(myController);
+      }
+      else {
+        Serial.println("Unsupported controller");
+      }
+    }
+  }
+}
+
+// Arduino setup function
+void setup() {
+  // Initialize Serial Monitor for debugging
+  Serial.begin(115200);
+  Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
+  
+  // Initialize Serial2 for Arduino communication with RX on GPIO 16, TX on GPIO 17
+  SerialPort.begin(9600, SERIAL_8N1, 16, 17);
+  Serial.println("ESP32 Controller to Arduino communication initialized");
+  
+  const uint8_t* addr = BP32.localBdAddress();
+  Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+
+  //uncomment this once bt address is known.
+   //Configure allowlist
+      bd_addr_t controller_addr;
+      sscanf_bd_addr(controller_addr_string, controller_addr);
+      uni_bt_allowlist_add_addr(controller_addr); // Add the controller to the allowlist
+      uni_bt_allowlist_set_enabled(true);         // Enable the allowlist
+  
+  // Setup the Bluepad32 callbacks
+  BP32.setup(&onConnectedController, &onDisconnectedController);
+  BP32.forgetBluetoothKeys();
+  BP32.enableVirtualDevice(false);
+  
+  // Send initial message to Arduino
+  SerialPort.println("ESP32 controller system ready!");
+}
+unsigned long lastSendTime = 0;
+const unsigned long sendInterval = 2; // send every 2ms
+
+void loop() {
+ // Get the current time
+  unsigned long currentTime = millis();
+
+  // Check if the required interval has passed
+  if (currentTime - lastSendTime >= sendInterval) {
+    lastSendTime = currentTime; // Update the last execution time
+
+    // Fetch controller data
+    bool dataUpdated = BP32.update();
+
+    // Process controllers only if data has been updated
+    if (dataUpdated) {
+      processControllers();
+    } else {
+      // No new data - reapply the last known state to ensure servo consistency
+      for (auto myController : myControllers) {
+        if (myController && myController->isConnected() && myController->isGamepad()) {
+          // Re-apply the last known joystick positions or button states
+          processGamepad(myController); 
+        }
+      }
+    }
+
+  }
+}
