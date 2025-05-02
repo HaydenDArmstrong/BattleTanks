@@ -292,4 +292,5 @@ void printControllerDebug(uint16_t btnVal, uint8_t dpadVal, int lxVal, int lyVal
     Serial.print(", ");
     Serial.print(ryVal);
     Serial.print(")");
-    Seri
+    Serial.println(".");
+}
