@@ -1,3 +1,4 @@
+
 void initial() {
   Serial.println("Initializing system components...");
   delay(100);
@@ -5,36 +6,56 @@ void initial() {
   // Test servo
   Serial.print("Testing servo... ");
   LRServo.attach(LRServoPin);
-  LRServo.write(90); // Move to center position
+  LRServo.write(160); // Move to center position
   delay(500);
-  LRServo.write(0); // Move to left position
+  LRServo.write(140); // Move to left position
   delay(500);
   LRServo.write(180); // Move to right position
   delay(500);
-  LRServo.write(90); // Reset to center
+  LRServo.write(140); // Reset to center
   Serial.println("Servo OK.");
 
   Serial.print("Testing servo up down... ");
   UDServo.attach(UDServoPin);
-  UDServo.write(90); // Move to center position
+  UDServo.write(155); // Move to center position
   delay(500);
-  UDServo.write(30); // Move to left position
+  UDServo.write(180); // Move to left position
   delay(500);
-  UDServo.write(180); // Move to right position
+  UDServo.write(135); // Move to right position
   delay(500);
-  UDServo.write(90); // Reset to center
+  UDServo.write(155); // Reset to center
   Serial.println("Servo OK.");
 
-  // // Test laser detector
-  // Serial.print("Testing laser receiver... ");
-  // int laserDetected = digitalRead(laserReceiverLeftPin);
-  // if (laserDetected == LOW) {
-  //   Serial.println("Laser Receiver OK. Laser detected");
-  // } else if (laserDetected == HIGH) {
-  //   Serial.println("Laser Receiver OK. No Laser Detected");
-  // } else {
-  //   Serial.println("Laser Receiver FAILED");
-  // }
+   // Test laser detector
+   Serial.print("Testing laser receiver... left ");
+   int laserDetected = digitalRead(laserReceiverLeftPin);
+   if (laserDetected == HIGH) {
+     Serial.println("Laser Receiver OK. Laser detected HIGH");
+ } else if (laserDetected == LOW) {
+     Serial.println("Laser Receiver OK. No Laser Detected LOW");
+   } else {
+     Serial.println("Laser Receiver FAILED");
+   }
+   // Test laser detector
+   Serial.print("Testing laser receiver... middle ");
+   int laserDetected2 = digitalRead(laserReceiverMiddlePin);
+   if (laserDetected2 == HIGH) {
+     Serial.println("Laser Receiver OK. Laser detected HIGH");
+ } else if (laserDetected2 == LOW) {
+     Serial.println("Laser Receiver OK. No Laser Detected LOW");
+   } else {
+     Serial.println("Laser Receiver FAILED");
+   }
+   // Test laser detector
+   Serial.print("Testing laser receiver... right ");
+   int laserDetected3 = digitalRead(laserReceiverRightPin);
+   if (laserDetected3 == HIGH) {
+     Serial.println("Laser Receiver OK. Laser detected HIGH");
+ } else if (laserDetected3 == LOW) {
+     Serial.println("Laser Receiver OK. No Laser Detected LOW");
+   } else {
+     Serial.println("Laser Receiver FAILED");
+   }
 
   // Test motors
   Serial.print("Testing motors... ");
